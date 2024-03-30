@@ -2,6 +2,7 @@ use chrono::prelude::*;
 use env_logger::{Builder, Env, Target};
 use log::{debug, info, warn};
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use std::error::Error;
 use std::fs;
@@ -42,14 +43,12 @@ impl BackupVerifier {
             .any(|exclude| file.starts_with(exclude))
     }
 
-    // TODO: Make this more efficient by not calling sha256 for every file
-    fn sha256(&self, file: &Path) -> io::Result<String> {
-        let output = Command::new("sha256sum").arg(file).output()?;
-        Ok(String::from_utf8_lossy(&output.stdout)
-            .split(' ')
-            .next()
-            .expect("Failed to parse sha256sum output")
-            .to_string())
+    fn sha256(&self, path: &Path) -> io::Result<[u8; 32]> {
+        let mut file = fs::File::open(path)?;
+        let mut hasher = Sha256::new();
+        io::copy(&mut file, &mut hasher)?;
+        let hash = hasher.finalize();
+        Ok(hash.into())
     }
 
     // Verify the source file against the backup
@@ -57,6 +56,7 @@ impl BackupVerifier {
         // If file is an absolute Path we need to strip the leading slash, otherwise
         // backup_dir.join(file) will return file, instead of the joined paths.
         // See https://doc.rust-lang.org/std/path/struct.Path.html#method.join.
+        // TODO: Add support for relative paths.
         let relative_file = file.strip_prefix("/").unwrap_or(file);
         let counterpart = self.backup_dir.join(relative_file);
 
@@ -209,6 +209,8 @@ impl BackupVerifier {
 }
 
 fn main() {
+    // TODO: Add support for --max-age
+
     // Set the default logging level to info, if not set via LOG_LEVEL
     Builder::from_env(Env::default().filter_or("LOG_LEVEL", "info"))
         .target(Target::Stdout)

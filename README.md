@@ -17,25 +17,46 @@ Only the fantastic [restic](https://github.com/restic/restic) is supported at th
 
 Set the `RESTIC_REPOSITORY` and `RESTIC_PASSWORD` environment variables and run `cargo run`.
 
-### Example (assuming you cloned Bacify into *$HOME/dev/bacify*):
+### Examples
+
+NOTE: Assuming you cloned Bacify into *$HOME/dev/bacify*
+
+#### Backup snapshot with an absolute path
 
 Create backup and verify the data in the repository:
 ```
+$ cd $HOME/dev/bacify
 $ export RESTIC_REPOSITORY="$HOME/tmp/restic-repo"
 $ export RESTIC_PASSWORD="foo"
 $ restic init
 $ restic backup $HOME/dev/bacify
-$ restic check --read-data
 ```
 
 Verify the backup against the local files:
 ```
-$ cd ~/dev/bacify
-$ export RESTIC_REPOSITORY="$HOME/tmp/restic-repo"
-$ export RESTIC_PASSWORD="foo"
-$ export LOG_LEVEL=debug
 $ cargo run
 ```
+
+#### Backup snapshot with a relative path
+
+Create backup and verify the data in the repository:
+```
+$ cd $HOME/dev/bacify
+$ export RESTIC_REPOSITORY="$HOME/tmp/restic-repo"
+$ export RESTIC_PASSWORD="foo"
+$ restic init
+$ restic backup .
+```
+
+Verify the backup against the local files:
+```
+$ cargo run -- --relative-path
+```
+
+*--relative-path* is needed as the snapshot metadata lists absolute paths,
+but the files are actually restored without the leading path components.
+
+### Excludes
 
 > [!WARNING]
 > Read this is you get a lot of errors about missing files!<br>

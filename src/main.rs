@@ -1,4 +1,5 @@
 use chrono::prelude::*;
+use clap::Parser;
 use env_logger::{Builder, Env, Target};
 use log::{debug, info, warn};
 use serde_json::Value;
@@ -19,10 +20,17 @@ struct BackupVerifier {
     source_dir: PathBuf,
     id: String,
     excludes: Vec<String>,
+    relative_path: bool,
+}
+
+#[derive(Parser, Debug)]
+struct Args {
+    #[arg(short, long)]
+    relative_path: bool,
 }
 
 impl BackupVerifier {
-    fn new() -> BackupVerifier {
+    fn new(relative_path: bool) -> BackupVerifier {
         BackupVerifier {
             missing: HashSet::new(),
             corrupt: HashSet::new(),
@@ -31,6 +39,7 @@ impl BackupVerifier {
             source_dir: PathBuf::new(),
             id: String::new(),
             excludes: Vec::new(),
+            relative_path,
         }
     }
 
@@ -53,11 +62,18 @@ impl BackupVerifier {
 
     // Verify the source file against the backup
     fn verify_source_file(&mut self, file: &Path) -> io::Result<()> {
-        // If file is an absolute Path we need to strip the leading slash, otherwise
-        // backup_dir.join(file) will return file, instead of the joined paths.
-        // See https://doc.rust-lang.org/std/path/struct.Path.html#method.join.
-        // TODO: Add support for relative paths.
-        let relative_file = file.strip_prefix("/").unwrap_or(file);
+        // Relative paths restore right into the temporary directory, but in the snapshot metadata
+        // there is an absolute path.
+        // Use --relative-path (or -r) to remove the leading path components.
+        let relative_file = if self.relative_path {
+            file.strip_prefix(self.source_dir.as_path())
+                .expect("Could not strip prefix")
+        } else {
+            // If file is an absolute Path we need to strip the leading slash, otherwise
+            // backup_dir.join(file) will return file, instead of the joined paths.
+            // See https://doc.rust-lang.org/std/path/struct.Path.html#method.join.
+            file.strip_prefix("/").unwrap_or(file)
+        };
         let counterpart = self.backup_dir.join(relative_file);
 
         let file_metadata = fs::metadata(file)?;
@@ -216,12 +232,14 @@ fn main() {
         .target(Target::Stdout)
         .init();
 
+    let args = Args::parse();
+
     // We want to see some output during restore, needs at least restic version 0.16.0
     if std::env::var_os("RESTIC_PROGRESS_FPS").is_none() {
         std::env::set_var("RESTIC_PROGRESS_FPS", "0.5");
     }
 
-    let mut verifier = BackupVerifier::new();
+    let mut verifier = BackupVerifier::new(args.relative_path);
     match verifier.main() {
         Err(e) => {
             info!("Error: {}", e);

@@ -13,7 +13,6 @@ Bacify looks for files that
 ## Usage
 
 Only the fantastic [restic](https://github.com/restic/restic) is supported at the moment!
-(And only backup snapshots of absolute paths.)
 
 Set the `RESTIC_REPOSITORY` and `RESTIC_PASSWORD` environment variables and run `cargo run`.
 

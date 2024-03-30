@@ -1,5 +1,7 @@
 # Bacify
 
+[![Rust](https://github.com/marius/bacify/actions/workflows/rust.yml/badge.svg)](https://github.com/marius/bacify/actions/workflows/rust.yml)
+
 ## Description
 
 The name is short for Backup&Verify.

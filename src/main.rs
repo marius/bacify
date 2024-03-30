@@ -262,7 +262,7 @@ mod tests {
         let mut file = File::create(&exclude_file_path)?;
         file.write_all(&[0xff, 0xfe, 0xfd])?; // Invalid UTF-8 sequence
 
-        let verifier = BackupVerifier::new();
+        let verifier = BackupVerifier::new(true);
 
         let result = verifier.load_excludes(exclude_file_path);
         assert!(result.is_err());
@@ -276,7 +276,7 @@ mod tests {
         let temp_dir = tempfile::TempDir::with_prefix("bacify-test-")?;
         let exclude_file_path = temp_dir.path().join("nonexistent_file");
 
-        let verifier = BackupVerifier::new();
+        let verifier = BackupVerifier::new(true);
 
         let result = verifier.load_excludes(exclude_file_path)?;
         assert!(result.is_empty());

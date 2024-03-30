@@ -9,8 +9,15 @@
       "request": "launch",
       "name": "Debug",
       "program": "${workspaceFolder}/target/debug/bacify",
-      "args": [],
-      "cwd": "${workspaceFolder}"
+      "args": [
+        "--max-age=700d"
+      ],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "LOG_LEVEL": "debug",
+        "RESTIC_PASSWORD": "foo",
+        "RESTIC_REPOSITORY": "/home/marius/tmp/bacify-relative-repo",
+      }
     }
   ]
 }

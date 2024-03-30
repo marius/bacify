@@ -1,7 +1,7 @@
 use chrono::prelude::*;
 use clap::Parser;
 use env_logger::{Builder, Env, Target};
-use log::{debug, info, warn};
+use log::{debug, error, info, warn};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
@@ -21,16 +21,20 @@ struct BackupVerifier {
     id: String,
     excludes: Vec<String>,
     relative_path: bool,
+    max_age: Option<humantime::Duration>,
 }
 
 #[derive(Parser, Debug)]
 struct Args {
     #[arg(short, long)]
     relative_path: bool,
+
+    #[arg(short, long)]
+    max_age: Option<humantime::Duration>,
 }
 
 impl BackupVerifier {
-    fn new(relative_path: bool) -> BackupVerifier {
+    fn new(relative_path: bool, max_age: Option<humantime::Duration>) -> BackupVerifier {
         BackupVerifier {
             missing: HashSet::new(),
             corrupt: HashSet::new(),
@@ -40,6 +44,7 @@ impl BackupVerifier {
             id: String::new(),
             excludes: Vec::new(),
             relative_path,
+            max_age,
         }
     }
 
@@ -121,11 +126,6 @@ impl BackupVerifier {
     }
 
     fn main(&mut self) -> Result<(), Box<dyn Error>> {
-        let home_dir = dirs::home_dir().ok_or("Could not find home directory")?;
-        let excludes_file = home_dir.join(".backup_exclude");
-
-        self.excludes = self.load_excludes(excludes_file)?;
-
         let snapshot_info = Command::new("restic")
             .args(["snapshots", "--json", "--latest", "1"])
             .output()?;
@@ -156,6 +156,20 @@ impl BackupVerifier {
         if !self.source_dir.is_dir() {
             return Err(format!("Couldn't find source directory {:?}", self.source_dir).into());
         }
+
+        // Check if the backup is too old
+        if let Some(max_age) = self.max_age {
+            let now = chrono::Local::now().fixed_offset();
+            let seconds_since_backup = (now - self.backup_time).num_seconds();
+            if seconds_since_backup > max_age.as_secs().try_into()? {
+                return Err("Backup is too old".into());
+            }
+        }
+
+        // Load excludes from ~/.backup_exclude
+        let home_dir = dirs::home_dir().ok_or("Could not find home directory")?;
+        let excludes_file = home_dir.join(".backup_exclude");
+        self.excludes = self.load_excludes(excludes_file)?;
 
         // Log some information about the snapshot
         Command::new("restic")
@@ -225,8 +239,6 @@ impl BackupVerifier {
 }
 
 fn main() {
-    // TODO: Add support for --max-age
-
     // Set the default logging level to info, if not set via LOG_LEVEL
     Builder::from_env(Env::default().filter_or("LOG_LEVEL", "info"))
         .target(Target::Stdout)
@@ -239,10 +251,10 @@ fn main() {
         std::env::set_var("RESTIC_PROGRESS_FPS", "0.5");
     }
 
-    let mut verifier = BackupVerifier::new(args.relative_path);
+    let mut verifier = BackupVerifier::new(args.relative_path, args.max_age);
     match verifier.main() {
         Err(e) => {
-            info!("Error: {}", e);
+            error!("Error: {}", e);
             std::process::exit(1)
         }
         Ok(()) => info!("Verification succeeded."),
@@ -262,7 +274,7 @@ mod tests {
         let mut file = File::create(&exclude_file_path)?;
         file.write_all(&[0xff, 0xfe, 0xfd])?; // Invalid UTF-8 sequence
 
-        let verifier = BackupVerifier::new(true);
+        let verifier = BackupVerifier::new(true, None);
 
         let result = verifier.load_excludes(exclude_file_path);
         assert!(result.is_err());
@@ -276,7 +288,7 @@ mod tests {
         let temp_dir = tempfile::TempDir::with_prefix("bacify-test-")?;
         let exclude_file_path = temp_dir.path().join("nonexistent_file");
 
-        let verifier = BackupVerifier::new(true);
+        let verifier = BackupVerifier::new(true, None);
 
         let result = verifier.load_excludes(exclude_file_path)?;
         assert!(result.is_empty());

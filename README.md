@@ -62,6 +62,10 @@ but the files are actually restored without the leading path components.
 > At the moment there is only support for a hard-coded, single exclude file named `$HOME/.backup_exclude`.<br>
 > Bacify does ***NOT*** (yet) support the full exclude file syntax, only prefixes are compared!
 
+### Maximum backup age
+
+You can use `--max-age` to make bacify return an error if the backup is too old. Human readable format, e.g. `3d` or `2w`, should work fine.
+
 ## License
 
 MIT

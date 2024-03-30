@@ -89,6 +89,7 @@ dependencies = [
  "dirs",
  "env_logger",
  "generic-array 1.0.0",
+ "humantime",
  "log",
  "serde_json",
  "sha2",

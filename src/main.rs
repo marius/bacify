@@ -24,15 +24,6 @@ struct BackupVerifier {
     max_age: Option<humantime::Duration>,
 }
 
-#[derive(Parser, Debug)]
-struct Args {
-    #[arg(short, long)]
-    relative_path: bool,
-
-    #[arg(short, long)]
-    max_age: Option<humantime::Duration>,
-}
-
 impl BackupVerifier {
     fn new(relative_path: bool, max_age: Option<humantime::Duration>) -> BackupVerifier {
         BackupVerifier {
@@ -41,7 +32,7 @@ impl BackupVerifier {
             backup_dir: PathBuf::new(),
             backup_time: chrono::Local::now().fixed_offset(), // Placeholder, actual value would be set later
             source_dir: PathBuf::new(),
-            id: String::new(),
+            id: String::new(), // Restic snapshot id
             excludes: Vec::new(),
             relative_path,
             max_age,
@@ -119,7 +110,7 @@ impl BackupVerifier {
         let file_contents = fs::read_to_string(excludes_file);
         match file_contents {
             Ok(contents) => Ok(contents.lines().map(String::from).collect::<Vec<String>>()),
-            // If the file doesn't exist, return an empty list
+            // If the file doesn't exist, return an empty list because no exclude file means no excludes
             Err(ref e) if e.kind() == io::ErrorKind::NotFound => Ok(Vec::new()),
             Err(e) => Err(e.into()),
         }
@@ -127,7 +118,7 @@ impl BackupVerifier {
 
     fn main(&mut self) -> Result<(), Box<dyn Error>> {
         let snapshot_info = Command::new("restic")
-            .args(["snapshots", "--json", "--latest", "1"])
+            .args(["snapshots", "--json", "--latest", "1"]) // Get metadata for the latest 1 snapshot
             .output()?;
 
         if snapshot_info.stdout.is_empty() {
@@ -192,9 +183,7 @@ impl BackupVerifier {
                 "restore",
                 &self.id,
                 "--target",
-                self.backup_dir
-                    .to_str()
-                    .ok_or("Invalid backup directory path")?,
+                self.backup_dir.to_str().ok_or("Invalid backup directory")?,
             ])
             .status()?;
         Ok(())
@@ -236,6 +225,15 @@ impl BackupVerifier {
         }
         result
     }
+}
+
+#[derive(Parser, Debug)]
+struct Args {
+    #[arg(short, long)]
+    relative_path: bool,
+
+    #[arg(short, long)]
+    max_age: Option<humantime::Duration>,
 }
 
 fn main() {
@@ -294,5 +292,33 @@ mod tests {
         assert!(result.is_empty());
 
         Ok(())
+    }
+
+    #[test]
+    fn test_excluded_exact_match() {
+        let mut verifier = BackupVerifier::new(false, None);
+        verifier.excludes.push("/home/user/exclude_this".into());
+        assert!(verifier.excluded(Path::new("/home/user/exclude_this")));
+    }
+
+    #[test]
+    fn test_excluded_starts_with_match() {
+        let mut verifier = BackupVerifier::new(false, None);
+        verifier.excludes.push("/home/user/exclude".into());
+        assert!(verifier.excluded(Path::new("/home/user/exclude/subdir")));
+    }
+
+    #[test]
+    fn test_not_excluded_no_match() {
+        let mut verifier = BackupVerifier::new(false, None);
+        verifier.excludes.push("/home/user/exclude".into());
+        assert!(!verifier.excluded(Path::new("/home/user/include")));
+    }
+
+    #[test]
+    fn test_not_excluded_partial_match() {
+        let mut verifier = BackupVerifier::new(false, None);
+        verifier.excludes.push("/home/user/exclude".into());
+        assert!(!verifier.excluded(Path::new("/home/user/exclude_this")));
     }
 }

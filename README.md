@@ -64,7 +64,7 @@ but the files are actually restored without the leading path components.
 
 ### Maximum backup age
 
-You can use `--max-age` to make bacify return an error if the backup is too old. Human readable format, e.g. `3d` or `2w`, should work fine.
+You can use `--max-age` to make bacify return an error if the backup is too old. Human readable format, e.g. `3d` or `2w` should work fine.
 
 ## License
 

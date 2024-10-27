@@ -58,7 +58,7 @@ but the files are actually restored without the leading path components.
 ### Excludes
 
 > [!WARNING]
-> Read this is you get a lot of errors about missing files!<br>
+> Read this if you get a lot of errors about missing files!<br>
 > At the moment there is only support for a hard-coded, single exclude file named `$HOME/.backup_exclude`.<br>
 > Bacify does ***NOT*** (yet) support the full exclude file syntax, only prefixes are compared!
 
